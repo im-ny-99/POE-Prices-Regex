@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PoE Currency Regex Generator</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: #0f1115;
+      color: #e2e8f0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
+    .card {
+      background-color: #1a1d24;
+      border: 1px solid #2d3748;
+      border-radius: 12px;
+      padding: 28px;
+      width: 100%;
+      max-width: 520px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+    }
+    h2 {
+      color: #f6ad55;
+      font-size: 1.4rem;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+    .form-group {
+      margin-bottom: 16px;
+    }
+    label {
+      display: block;
+      font-size: 0.85rem;
+      color: #a0aec0;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .row {
+      display: flex;
+      gap: 12px;
+    }
+    input, select {
+      width: 100%;
+      padding: 10px 14px;
+      background-color: #0f1115;
+      border: 1px solid #4a5568;
+      border-radius: 6px;
+      color: #fff;
+      font-size: 1rem;
+      outline: none;
+    }
+    input:focus, select:focus {
+      border-color: #f6ad55;
+    }
+    .result-box {
+      margin-top: 24px;
+      background-color: #0f1115;
+      border: 1px solid #2d3748;
+      border-radius: 8px;
+      padding: 14px;
+      position: relative;
+    }
+    .result-text {
+      font-family: monospace;
+      font-size: 1.05rem;
+      color: #68d391;
+      word-break: break-all;
+    }
+    .btn-copy {
+      margin-top: 12px;
+      width: 100%;
+      padding: 10px;
+      background-color: #dd6b20;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .btn-copy:hover {
+      background-color: #c05621;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="card">
+    <h2>PoE Currency Regex Generator</h2>
+    
+    <div class="form-group">
+      <div class="row">
+        <div style="flex: 1;">
+          <label for="min">Min Value</label>
+          <input type="number" id="min" value="1" min="0">
+        </div>
+        <div style="flex: 1;">
+          <label for="max">Max Value</label>
+          <input type="number" id="max" value="31" min="0">
+        </div>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="currency">Currency Type</label>
+      <select id="currency">
+        <option value="chaos">Chaos Orb</option>
+        <option value="divine">Divine Orb</option>
+      </select>
+    </div>
+
+    <div class="result-box">
+      <label>Generated Regex</label>
+      <div class="result-text" id="output">""</div>
+      <button class="btn-copy" onclick="copyRegex()">Copy Regex</button>
+    </div>
+  </div>
+
+  <script>
+    /**
+     * Generates a Regex pattern matching a range of integers between min and max.
+     * @param {number} min - Lower bound
+     * @param {number} max - Upper bound
+     * @returns {string} Formatted Regex pattern for the numeric range
+     */
+    function generateRangeRegex(min, max) {
+      if (min > max) [min, max] = [max, min];
+      if (min === max) return min.toString();
+
+      let patterns = [];
+      let curr = min;
+
+      while (curr <= max) {
+        if (curr === max) {
+          patterns.push(curr.toString());
+          break;
+        }
+
+        let nextPower = Math.pow(10, curr.toString().length);
+        let target = Math.min(max, nextPower - 1);
+
+        // Group numbers sharing the same digit length
+        if (curr.toString().length === target.toString().length) {
+          let cStr = curr.toString();
+          let tStr = target.toString();
+
+          if (cStr.length === 1) {
+            patterns.push(`[${cStr}-${tStr}]`);
+          } else if (cStr[0] === tStr[0]) {
+            patterns.push(`${cStr[0]}[${cStr[1]}-${tStr[1]}]`);
+          } else {
+            patterns.push(`[${cStr[0]}-${tStr[0]}][0-9]`);
+          }
+          curr = target + 1;
+        } else {
+          curr++;
+        }
+      }
+
+      return patterns.length === 1 ? patterns[0] : `(${patterns.join('|')})`;
+    }
+
+    /**
+     * Reads UI inputs and updates the output Regex string.
+     */
+    function updateRegex() {
+      const min = parseInt(document.getElementById('min').value) || 0;
+      const max = parseInt(document.getElementById('max').value) || 0;
+      const currency = document.getElementById('currency').value;
+
+      if (min < 0 || max < 0) {
+        document.getElementById('output').innerText = "Values must be greater than or equal to 0";
+        return;
+      }
+
+      const numPattern = generateRangeRegex(min, max);
+      const finalRegex = `\"\\s${numPattern} ${currency}\"`;
+
+      document.getElementById('output').innerText = finalRegex;
+    }
+
+    /**
+     * Copies the generated Regex to the user's clipboard and handles visual feedback.
+     */
+    function copyRegex() {
+      const text = document.getElementById('output').innerText;
+      navigator.clipboard.writeText(text);
+      
+      const btn = document.querySelector('.btn-copy');
+      btn.innerText = "Copied!";
+      setTimeout(() => btn.innerText = "Copy Regex", 1500);
+    }
+
+    // Attach event listeners for real-time updates
+    document.getElementById('min').addEventListener('input', updateRegex);
+    document.getElementById('max').addEventListener('input', updateRegex);
+    document.getElementById('currency').addEventListener('change', updateRegex);
+
+    // Initial trigger on page load
+    updateRegex();
+  </script>
+</body>
+</html>
