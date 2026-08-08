@@ -125,47 +125,79 @@
 
   <script>
     /**
-     * Generates a Regex pattern matching a range of integers between min and max.
-     * @param {number} min - Lower bound
-     * @param {number} max - Upper bound
-     * @returns {string} Formatted Regex pattern for the numeric range
-     */
-    function generateRangeRegex(min, max) {
-      if (min > max) [min, max] = [max, min];
-      if (min === max) return min.toString();
+ * Generates an exact Regex pattern matching an integer range between min and max.
+ * @param {number} min - Lower bound
+ * @param {number} max - Upper bound
+ * @returns {string} Formatted Regex pattern
+ */
+function generateRangeRegex(min, max) {
+  if (min > max) [min, max] = [max, min];
+  if (min === max) return min.toString();
 
-      let patterns = [];
-      let curr = min;
+  const patterns = [];
 
-      while (curr <= max) {
-        if (curr === max) {
-          patterns.push(curr.toString());
-          break;
-        }
-
-        let nextPower = Math.pow(10, curr.toString().length);
-        let target = Math.min(max, nextPower - 1);
-
-        // Group numbers sharing the same digit length
-        if (curr.toString().length === target.toString().length) {
-          let cStr = curr.toString();
-          let tStr = target.toString();
-
-          if (cStr.length === 1) {
-            patterns.push(`[${cStr}-${tStr}]`);
-          } else if (cStr[0] === tStr[0]) {
-            patterns.push(`${cStr[0]}[${cStr[1]}-${tStr[1]}]`);
-          } else {
-            patterns.push(`[${cStr[0]}-${tStr[0]}][0-9]`);
-          }
-          curr = target + 1;
-        } else {
-          curr++;
-        }
-      }
-
-      return patterns.length === 1 ? patterns[0] : `(${patterns.join('|')})`;
+  // Helper to split a range into valid regex chunks
+  function rangeToRegex(a, b) {
+    if (a > b) return;
+    if (a === b) {
+      patterns.push(a.toString());
+      return;
     }
+
+    const aStr = a.toString();
+    const bStr = b.toString();
+
+    // If different digit counts, split at the boundary (e.g., 9 -> 10)
+    if (aStr.length !== bStr.length) {
+      const nextPower = Math.pow(10, aStr.length);
+      rangeToRegex(a, nextPower - 1);
+      rangeToRegex(nextPower, b);
+      return;
+    }
+
+    // Single digit range (e.g., 1 to 9)
+    if (aStr.length === 1) {
+      patterns.push(`[${a}-${b}]`);
+      return;
+    }
+
+    // Two digits with same tens place (e.g., 30 to 31)
+    if (aStr[0] === bStr[0]) {
+      if (aStr[1] === '0' && bStr[1] === '9') {
+        patterns.push(`${aStr[0]}[0-9]`);
+      } else if (aStr[1] === bStr[1]) {
+        patterns.push(`${aStr[0]}${aStr[1]}`);
+      } else {
+        patterns.push(`${aStr[0]}[${aStr[1]}-${bStr[1]}]`);
+      }
+      return;
+    }
+
+    // Two digits with different tens place (e.g., 10 to 31)
+    // 1. Process remainder of start tens (e.g., 12 to 19)
+    if (aStr[1] !== '0') {
+      const subEnd = parseInt(aStr[0] + '9');
+      rangeToRegex(a, subEnd);
+      rangeToRegex(subEnd + 1, b);
+      return;
+    }
+
+    // 2. Process remainder of end tens (e.g., 30 to 31)
+    if (bStr[1] !== '9') {
+      const subStart = parseInt(bStr[0] + '0');
+      rangeToRegex(a, subStart - 1);
+      rangeToRegex(subStart, b);
+      return;
+    }
+
+    // 3. Full tens range (e.g., 10 to 29 -> [1-2][0-9])
+    patterns.push(`[${aStr[0]}-${bStr[0]}][0-9]`);
+  }
+
+  rangeToRegex(min, max);
+
+  return patterns.length === 1 ? patterns[0] : `(${patterns.join('|')})`;
+}
 
     /**
      * Reads UI inputs and updates the output Regex string.
